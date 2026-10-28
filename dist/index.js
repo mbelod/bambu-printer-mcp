@@ -3600,6 +3600,7 @@ class BambuPrinterMCPServer {
                             vibrationCalibration: args?.vibration_calibration !== undefined ? Boolean(args.vibration_calibration) : undefined,
                             layerInspect: args?.layer_inspect !== undefined ? Boolean(args.layer_inspect) : undefined,
                             timelapse: args?.timelapse !== undefined ? Boolean(args.timelapse) : undefined,
+                            bedClearedForJob: args?.bed_cleared_for_job !== undefined ? String(args.bed_cleared_for_job) : undefined,
                         });
                         // Report what the printer did, not merely that a command was published.
                         break;
@@ -3636,7 +3637,6 @@ class BambuPrinterMCPServer {
                             flowCalibration: args?.flow_calibration !== undefined ? Boolean(args.flow_calibration) : true,
                             vibrationCalibration: args?.vibration_calibration !== undefined ? Boolean(args.vibration_calibration) : true,
                             timelapse: args?.timelapse !== undefined ? Boolean(args.timelapse) : false,
-                            bedClearedForJob: args?.bed_cleared_for_job !== undefined ? String(args.bed_cleared_for_job) : undefined,
                         });
                         result = {
                             ...result,
