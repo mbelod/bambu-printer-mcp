@@ -3082,7 +3082,7 @@ class BambuPrinterMCPServer {
                   type: "boolean",
                   description: "When true, match the sliced 3MF's tray_info_idx requirements against live AMS inventory and use the resulting ams_slots. Ignored when ams_mapping or ams_slots is provided."
                 },
-                bed_cleared_for_job: { type: "string", description: "Token from a FINISH refusal. Pass it only after removing that finished part and any debris; it lets this print proceed without an elicitation prompt for that exact finished job. A token for any other job is ignored." },
+                bed_cleared_for_job: { type: "string", description: "Token from a FINISH or FAILED refusal. Pass it only after removing that finished or partial part and any debris; it lets this print proceed without an elicitation prompt for that exact job. A token for any other job is ignored." },
                 bed_leveling: { type: "boolean", description: "Enable auto bed leveling (default: true)" },
                                 flow_calibration: { type: "boolean", description: "Enable flow calibration (default: true)" },
                                 vibration_calibration: { type: "boolean", description: "Enable vibration calibration (default: true)" },

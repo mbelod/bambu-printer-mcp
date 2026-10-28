@@ -318,10 +318,16 @@ test("print_3mf passes bed_cleared_for_job through the tool handler to the FINIS
   assert.equal(server.events().filter((e) => e.action === "publish").length, 1);
 });
 
-test("print_3mf on a printer stuck in FAILED says how to clear it", async (t) => {
-  const server = await start(t, { elicitation: false, printerRaw: { gcode_state: "FAILED" }, env: { BAMBU_REQUIRE_CONFIRMATION: "0" } });
-  const result = await server.print(await server.makeProject("sliced.gcode.3mf", { sliced: true }));
-  assert.equal(result.isError, true);
-  assert.match(result.content?.[0]?.text || "", /FAILED.*Dismiss the failed job on the printer's screen/);
-  assert.deepEqual(server.events().filter((e) => ["upload", "publish"].includes(e.action)), []);
+test("print_3mf on a FAILED printer needs the job-bound token, then dispatches", async (t) => {
+  const server = await start(t, { elicitation: false, printerRaw: { ...finishedRaw, gcode_state: "FAILED", subtask_name: "stopped-part" }, env: { BAMBU_REQUIRE_CONFIRMATION: "0" } });
+  const project = await server.makeProject("sliced.gcode.3mf", { sliced: true });
+  const refused = await server.print(project);
+  assert.equal(refused.isError, true);
+  const message = refused.content?.[0]?.text || "";
+  assert.match(message, /^(Error: )?After removing the partial part.*bed_cleared_for_job="[0-9a-f]{12}".*"stopped-part" as FAILED/s);
+  assert.deepEqual(server.events().filter((e) => e.action === "publish"), []);
+  const token = message.match(/bed_cleared_for_job="([0-9a-f]{12})"/)[1];
+  const accepted = await server.print(project, { bed_cleared_for_job: token });
+  assert.equal(accepted.isError, undefined, accepted.content?.[0]?.text);
+  assert.equal(server.events().filter((e) => e.action === "publish").length, 1);
 });

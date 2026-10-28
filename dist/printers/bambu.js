@@ -438,7 +438,9 @@ export class BambuImplementation {
         }
     }
     finishedJobIdentity(status) {
-        return status.raw.gcode_state === "FINISH" ? JSON.stringify([status.raw.gcode_file, status.raw.subtask_name, status.raw.task_id, status.raw.subtask_id]) : undefined;
+        const state = typeof status.raw.gcode_state === "string" ? status.raw.gcode_state.toUpperCase() : "";
+        return state === "FINISH" || state === "FAILED"
+            ? JSON.stringify([state, status.raw.gcode_file, status.raw.subtask_name, status.raw.task_id, status.raw.subtask_id]) : undefined;
     }
     /**
      * The human print confirmation. Its result goes to assertBedClearance at
@@ -459,7 +461,7 @@ export class BambuImplementation {
         const confirmation = this.confirmHardwareAction(`Start a checked print on ${inspection.model.toUpperCase()} (${serial})? Nozzles: ${inspection.nozzleDiameters.join(", ")} mm. ` +
             `Materials: ${inspection.materials.join(", ")}. Peak targets: nozzle ${inspection.maxNozzleTemperature}°C, bed ${inspection.maxBedTemperature}°C, chamber ${inspection.maxChamberTemperature}°C. ` +
             `File SHA-256: ${inspection.sha256}. Confirm the physical spool labels and that the build plate is clear.` +
-            (finishedJob !== undefined ? " The printer reports FINISH: remove the previous part and debris before confirming." : "") +
+            (finishedJob !== undefined ? ` The printer reports ${status.raw.gcode_state}: remove the previous part and debris before confirming.` : "") +
             (cleared ? ` Previously cleared hardware codes: ${cleared.map(describeHmsKey).join(", ")}. Confirm their physical causes have been resolved.` : "") +
             (notices.length ? ` The printer also reports ${notices.join(", ")}, which Bambu lists for this model without text and never shows as a fault; ` +
                 `${notices.length === 1 ? "it does" : "they do"} not block printing.` : "") +
@@ -472,8 +474,9 @@ export class BambuImplementation {
             if (finishedToken === undefined || bedDeclaredClear || cleared)
                 throw error;
             const name = status.raw.subtask_name || status.raw.gcode_file || "previous job";
-            throw new Error(`After removing the finished part and any debris, retry with bed_cleared_for_job="${finishedToken}". ` +
-                `The printer still reports "${name}" as FINISH; dismissing the finished screen does not reset that state (a new job or a printer restart does). ` +
+            const state = String(status.raw.gcode_state).toUpperCase();
+            throw new Error(`After removing the ${state === "FAILED" ? "partial" : "finished"} part and any debris, retry with bed_cleared_for_job="${finishedToken}". ` +
+                `The printer still reports "${name}" as ${state}; dismissing the screen does not reset that state (a new job or a printer restart does). ` +
                 `${error?.message ?? error}`);
         }
         return { finishedJob, serial, model: inspection.model, notices };
@@ -482,7 +485,7 @@ export class BambuImplementation {
     assertBedClearance(status, preflight) {
         const current = this.finishedJobIdentity(status);
         if (current !== undefined && current !== preflight.finishedJob) {
-            throw new Error("Printer reports a newly finished job. Confirm that its part and debris have been removed before retrying the print.");
+            throw new Error("Printer reports a newly finished or failed job. Confirm that its part and debris have been removed before retrying the print.");
         }
         // An X2D raises its hidden camera notice about 15 seconds after boot, so it
         // can appear after the human confirmed. Never pass a notice nobody was told about.

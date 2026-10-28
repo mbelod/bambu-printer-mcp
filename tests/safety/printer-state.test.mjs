@@ -108,9 +108,12 @@ test('stock nozzles without an identity chip pass bit 0 while abnormal, unknown 
   assert.deepEqual(safety.unchippedNozzles(h2dReport({stat:0}).raw), [1]);
   assert.deepEqual(safety.unchippedNozzles({}), []);
 });
-test('rejects busy, failed, missing or unknown states while allowing IDLE and FINISH', () => {
-  for(const gcode_state of ['RUNNING','PAUSE','PREPARE','SLICING','FAILED','OFFLINE','UNKNOWN',undefined]) assert.throws(() => check(fresh({gcode_state})), /state|idle/i);
+test('rejects busy, missing or unknown states while allowing settled IDLE, FINISH and FAILED', () => {
+  for(const gcode_state of ['RUNNING','PAUSE','PREPARE','SLICING','OFFLINE','UNKNOWN',undefined]) assert.throws(() => check(fresh({gcode_state})), /state|idle/i);
   assert.doesNotThrow(() => check(fresh({gcode_state:'FINISH'})));
+  // FAILED is settled; print dispatch separately demands bed clearance for it.
+  assert.doesNotThrow(() => check(fresh({gcode_state:'FAILED'})));
+  assert.throws(() => check(fresh({gcode_state:'FAILED',print_error:1})), /error/i);
 });
 test('requires explicit clean print error and valid HMS severity, but permits informative HMS', () => {
   for(const print_error of [undefined,1,'03008004','not-a-number']) assert.throws(() => check(fresh({print_error})), /error/i);

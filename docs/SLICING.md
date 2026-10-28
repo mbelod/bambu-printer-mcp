@@ -307,3 +307,5 @@ precedence.
 | `0700-8012 032015` | AMS-map length mismatches plate's filament count | Re-slice; don't hand-edit the file. Confirm AMS slot matches loaded filament |
 | Print starts, heats, no extrusion | Stale start-g-code from different printer profile | Re-slice with the correct printer profile |
 | CLI slicing fails | Missing profiles, unsupported flags, or slicer-version failure | Preserve the error; use matching presets or GUI-export a sliced `.gcode.3mf`. Do not upload the unsliced input |
+
+A failed or stopped job leaves the printer in `FAILED`, which the A1 also keeps after its screen is dismissed. It is treated the same way: uploads are allowed, and a print is refused with a token for that failed job until the partial part is removed and the token is passed as `bed_cleared_for_job`. Print errors and HMS faults still refuse.

@@ -766,7 +766,7 @@ test("bed_cleared_for_job for the reported finished job skips the physical-check
   const { printer } = isolatedPrinter(finished);
   let prompted = false;
   printer.confirm = async () => { prompted = true; return false; };
-  const ok = printer.finishedJobToken(JSON.stringify([finished.raw.gcode_file, finished.raw.subtask_name, finished.raw.task_id, finished.raw.subtask_id]));
+  const ok = printer.finishedJobToken(JSON.stringify(["FINISH", finished.raw.gcode_file, finished.raw.subtask_name, finished.raw.task_id, finished.raw.subtask_id]));
   await printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false, bedClearedForJob: ok });
   assert.equal(prompted, false);
 });
@@ -786,7 +786,7 @@ test("bed clearance cannot authorize a different finished job", async (t) => {
   const file = await fixture(t);
   const { printer, events } = isolatedPrinter(safetyStatus({ state: "FINISH", subtask_name: "previous-part" }));
   printer.confirm = async () => { printer.getSafetyStatus = async () => safetyStatus({ state: "FINISH", subtask_name: "another-part" }); return true; };
-  await assert.rejects(printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false }), /newly finished job/i);
+  await assert.rejects(printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false }), /newly finished or failed job/i);
   assertNoDispatch(events);
 });
 

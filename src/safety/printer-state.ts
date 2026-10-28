@@ -304,9 +304,10 @@ function logHiddenNotices(raw: Record<string, any>, serial: string, model: strin
 
 function validateErrors(raw: Record<string,any>, requireIdle: boolean, serial: string, model: string) {
   const state = typeof raw.gcode_state === "string" ? raw.gcode_state.toUpperCase() : "UNKNOWN";
-  if (state === "FAILED") throw new Error("Printer state FAILED: the previous job failed or was stopped, and the printer keeps that state until it is cleared. Dismiss the failed job on the printer's screen (or restart the printer), then retry.");
-  if (requireIdle && !["IDLE","FINISH"].includes(state)) throw new Error(`Printer state ${state} is not safely idle.`);
-  if (!requireIdle && !["IDLE","FINISH","RUNNING","PAUSE"].includes(state)) throw new Error(`Printer state ${state} is unknown or failed.`);
+  // FAILED (a failed or stopped job) is settled like FINISH: the A1 keeps it after the screen is dismissed, until a new
+  // job or a restart. Print errors and HMS faults below still refuse; print dispatch also needs bed clearance for it.
+  if (requireIdle && !["IDLE","FINISH","FAILED"].includes(state)) throw new Error(`Printer state ${state} is not safely idle.`);
+  if (!requireIdle && !["IDLE","FINISH","FAILED","RUNNING","PAUSE"].includes(state)) throw new Error(`Printer state ${state} is unknown.`);
   if (finiteNumber(raw.print_error) !== 0) throw new Error("Printer reports a print error or did not report its error state.");
   if (!Array.isArray(raw.hms)) throw new Error("Printer HMS error state is missing or malformed.");
   for (const reported of raw.hms) {
