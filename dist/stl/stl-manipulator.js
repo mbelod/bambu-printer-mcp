@@ -221,18 +221,6 @@ export class STLManipulator extends EventEmitter {
     readJsonFile(filePath) {
         return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     }
-    stripAbsoluteExtruderResets(value) {
-        if (typeof value === 'string') {
-            return value
-                .split(/\r?\n/)
-                .filter((line) => line.trim().toUpperCase() !== 'G92 E0')
-                .join('\n');
-        }
-        if (Array.isArray(value)) {
-            return value.filter((line) => String(line).trim().toUpperCase() !== 'G92 E0');
-        }
-        return value;
-    }
     sanitizeProcessForOrca(processConfig, printerPreset, preserveExtrusionMode = false) {
         const sanitized = { ...processConfig };
         sanitized.type = 'process';
@@ -249,16 +237,12 @@ export class STLManipulator extends EventEmitter {
         else if (sanitized.prime_tower_brim_width !== undefined) {
             sanitized.prime_tower_brim_width = String(sanitized.prime_tower_brim_width);
         }
-        return preserveExtrusionMode ? sanitized : this.useAbsoluteExtrusionForOrca(sanitized);
-    }
-    /** Orca slices with absolute E distances; per-layer `G92 E0` resets would break them. */
-    useAbsoluteExtrusionForOrca(config) {
-        const normalized = { ...config };
-        normalized.use_relative_e_distances = '0';
-        normalized.before_layer_change_gcode = this.stripAbsoluteExtruderResets(normalized.before_layer_change_gcode);
-        normalized.layer_gcode = this.stripAbsoluteExtruderResets(normalized.layer_gcode);
-        normalized.layer_change_gcode = this.stripAbsoluteExtruderResets(normalized.layer_change_gcode);
-        return normalized;
+        // The extrusion mode is left to the presets. Bambu machine presets use
+        // relative E, and their layer-change G-code (e.g. the A1's clog check)
+        // issues M83 itself; forcing absolute E made the printer read cumulative
+        // E values as relative from layer 3 on and over-extrude.
+        void preserveExtrusionMode;
+        return sanitized;
     }
     writeTempJson(outputBase, suffix, value) {
         const serialized = JSON.stringify(value, null, 2);
@@ -1391,14 +1375,12 @@ export class STLManipulator extends EventEmitter {
                                 this.writeTempJson(outputBase, `machine_${bambuOptions.nozzleType}`, machine), ...rest,
                             ].join(';');
                         }
-                        // Inherited process G-code is now present; apply Orca's existing
-                        // absolute-extrusion normalization after resolving those ancestors.
-                        // The machine owns the extrusion mode and layer G-code once process
-                        // files lose machine keys, so normalize it there as well.
+                        // Inherited process settings are now present; sanitize the resolved
+                        // process. The machine preset keeps its own extrusion mode.
                         if (profileSlicerType === 'orcaslicer' && settingsBundle.settingsArg && profilesRoot === selectedProfilesRoot) {
                             const [machinePath, processPath] = settingsBundle.settingsArg.split(';');
                             settingsBundle.settingsArg = [
-                                this.writeTempJson(outputBase, 'machine_orca_resolved', this.useAbsoluteExtrusionForOrca(this.readJsonFile(machinePath))),
+                                machinePath,
                                 this.writeTempJson(outputBase, 'process_orca_resolved', this.sanitizeProcessForOrca(this.readJsonFile(processPath), printerPreset)),
                             ].join(';');
                         }

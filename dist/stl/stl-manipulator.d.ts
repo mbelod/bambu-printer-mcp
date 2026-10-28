@@ -62,10 +62,7 @@ export declare class STLManipulator extends EventEmitter {
     private findProfileFile;
     private buildFilamentIdIndex;
     private readJsonFile;
-    private stripAbsoluteExtruderResets;
     private sanitizeProcessForOrca;
-    /** Orca slices with absolute E distances; per-layer `G92 E0` resets would break them. */
-    private useAbsoluteExtrusionForOrca;
     private writeTempJson;
     private resolveBambuLikeSettingsBundle;
     /** Resolve BBL dependencies before invoking the CLI; failures stop the slice. */
