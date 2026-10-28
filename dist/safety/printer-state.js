@@ -296,6 +296,8 @@ function logHiddenNotices(raw, serial, model) {
 }
 function validateErrors(raw, requireIdle, serial, model) {
     const state = typeof raw.gcode_state === "string" ? raw.gcode_state.toUpperCase() : "UNKNOWN";
+    if (state === "FAILED")
+        throw new Error("Printer state FAILED: the previous job failed or was stopped, and the printer keeps that state until it is cleared. Dismiss the failed job on the printer's screen (or restart the printer), then retry.");
     if (requireIdle && !["IDLE", "FINISH"].includes(state))
         throw new Error(`Printer state ${state} is not safely idle.`);
     if (!requireIdle && !["IDLE", "FINISH", "RUNNING", "PAUSE"].includes(state))

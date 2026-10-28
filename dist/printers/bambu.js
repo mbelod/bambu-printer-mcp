@@ -36,10 +36,10 @@ function loadClientCreds() {
 }
 const CLIENT_CREDS = loadClientCreds();
 const COMMAND_SETTLE_MS = 300;
-/** HMS 0500-0500-0001-0007: firmware 01.08.05+ rejected an unsigned MQTT command. */
+/** HMS 0500-0500-0001-0007: firmware that enforces signed commands rejected an unsigned MQTT command. */
 const COMMAND_VERIFICATION_HMS = { attr: 0x05000500, code: 0x00010007 };
 const COMMAND_REJECTED_MESSAGE = "The printer rejected the print command (HMS 0500-0500-0001-0007, \"MQTT command verification failed\"). " +
-    "Bambu firmware 01.08.05 and later only accept third-party LAN control with LAN Only Mode and Developer Mode " +
+    "Bambu firmware that enforces signed commands (seen on P1S 01.08.05+ and A1 01.08.01) only accepts third-party LAN control with LAN Only Mode and Developer Mode " +
     "enabled (Settings > WLAN on the printer). The checked file is on the printer's storage, but nothing is printing. " +
     "The rejection stays on the printer as a fatal HMS entry that blocks later prints: after enabling those modes, " +
     "clear it with clear_hms_errors or dismiss it on the printer's screen, then print again.";
@@ -472,8 +472,9 @@ export class BambuImplementation {
             if (finishedToken === undefined || bedDeclaredClear || cleared)
                 throw error;
             const name = status.raw.subtask_name || status.raw.gcode_file || "previous job";
-            throw new Error(`${error?.message ?? error} The printer still reports "${name}" as FINISH; dismissing the finished screen does not reset that state ` +
-                `(a new job or a printer restart does). After removing that part and any debris, retry with bed_cleared_for_job="${finishedToken}".`);
+            throw new Error(`After removing the finished part and any debris, retry with bed_cleared_for_job="${finishedToken}". ` +
+                `The printer still reports "${name}" as FINISH; dismissing the finished screen does not reset that state (a new job or a printer restart does). ` +
+                `${error?.message ?? error}`);
         }
         return { finishedJob, serial, model: inspection.model, notices };
     }

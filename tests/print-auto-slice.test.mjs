@@ -16,7 +16,7 @@ process.env.BAMBU_DISPATCH_CHECK_MS = "0";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failure = "Required Bambu machine profile is missing nozzle_volume_type; select a matching machine and filament profile.";
 
-async function start(t, { sliceSucceeds = false, realSlice = false, slicerType = 'bambustudio', elicitDelayMs = 0, elicitation = true, confirmation = true, afterPublish, pushAfterPublish = false, env = {} } = {}) {
+async function start(t, { sliceSucceeds = false, realSlice = false, slicerType = 'bambustudio', elicitDelayMs = 0, elicitation = true, confirmation = true, afterPublish, pushAfterPublish = false, printerRaw = {}, env = {} } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "bambu-auto-slice-"));
   const log = path.join(directory, "calls.jsonl");
   const elicitLog = path.join(directory, "elicitations.jsonl");
@@ -76,7 +76,7 @@ BambuImplementation.prototype.getSafetyStatus = async function () {
   log({action:'safety-status'});
   const now=Date.now();
   return {connected:true,model:'p1s',status:'IDLE',serial:'TEST_SERIAL',
-    raw:{model:'p1s',gcode_state:'IDLE',nozzle_diameter:'0.4',print_error:0,hms:[],...(published ? ${JSON.stringify(afterPublish ?? {})} : {})},
+    raw:{model:'p1s',gcode_state:'IDLE',nozzle_diameter:'0.4',print_error:0,hms:[],...${JSON.stringify(printerRaw)},...(published ? ${JSON.stringify(afterPublish ?? {})} : {})},
     observation:{source:'mqtt',requestedAt:now,receivedAt:now,identitySource:'report'}};
 };
 `);
@@ -297,4 +297,31 @@ test('an accepted but unchecked hardware form explains missing confirmation and 
   assert.match(JSON.stringify(result.content),/checkbox|not checked/i);
   assert.doesNotMatch(JSON.stringify(result.content),/elicitation support|unavailable/i);
   assert.deepEqual(server.events().filter(event=>['upload','publish'].includes(event.action)),[]);
+});
+
+const finishedRaw = { gcode_state: "FINISH", gcode_file: "old-part.3mf", subtask_name: "old-part", task_id: "0", subtask_id: "0" };
+
+test("print_3mf passes bed_cleared_for_job through the tool handler to the FINISH bed check", async (t) => {
+  const server = await start(t, { elicitation: false, printerRaw: finishedRaw, env: { BAMBU_REQUIRE_CONFIRMATION: "0" } });
+  const project = await server.makeProject("sliced.gcode.3mf", { sliced: true });
+  const refused = await server.print(project);
+  assert.equal(refused.isError, true);
+  const message = refused.content?.[0]?.text || "";
+  const token = message.match(/bed_cleared_for_job="([0-9a-f]{12})"/)?.[1];
+  assert.ok(token, `refusal must lead with the token, got: ${message}`);
+  assert.match(message, /^(Error: )?After removing the finished part/);
+  assert.deepEqual(server.events().filter((e) => e.action === "publish"), [], "a refused print must not dispatch");
+  const stale = await server.print(project, { bed_cleared_for_job: "000000000000" });
+  assert.equal(stale.isError, true, "a stale token must not unlock the print");
+  const accepted = await server.print(project, { bed_cleared_for_job: token });
+  assert.equal(accepted.isError, undefined, accepted.content?.[0]?.text);
+  assert.equal(server.events().filter((e) => e.action === "publish").length, 1);
+});
+
+test("print_3mf on a printer stuck in FAILED says how to clear it", async (t) => {
+  const server = await start(t, { elicitation: false, printerRaw: { gcode_state: "FAILED" }, env: { BAMBU_REQUIRE_CONFIRMATION: "0" } });
+  const result = await server.print(await server.makeProject("sliced.gcode.3mf", { sliced: true }));
+  assert.equal(result.isError, true);
+  assert.match(result.content?.[0]?.text || "", /FAILED.*Dismiss the failed job on the printer's screen/);
+  assert.deepEqual(server.events().filter((e) => ["upload", "publish"].includes(e.action)), []);
 });

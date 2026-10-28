@@ -755,7 +755,7 @@ test("FINISH refusal explains the stale state and names a job-bound token", asyn
   const { printer, events } = isolatedPrinter(safetyStatus({ state: "FINISH", subtask_name: "previous-part" }));
   printer.confirm = async () => false;
   await assert.rejects(printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false }),
-    /"previous-part" as FINISH.*does not reset.*bed_cleared_for_job="[0-9a-f]{12}"/s);
+    /^Error: After removing the finished part.*bed_cleared_for_job="[0-9a-f]{12}".*"previous-part" as FINISH.*does not reset/s);
   assertNoDispatch(events);
 });
 
