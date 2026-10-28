@@ -190,10 +190,9 @@ for (const slicerType of ['bambustudio', 'orcaslicer', 'orcaslicer-bambulab']) {
     assert.equal(processConfig.wall_loops, '7');
     assert.equal(processConfig.layer_height, '0.2');
     if (slicerType === 'orcaslicer') {
-      // The machine owns the extrusion mode; the process cannot re-enable relative E.
-      assert.equal(machine.use_relative_e_distances, '0');
+      // The machine owns the extrusion mode; process layer G-code is passed through.
       assert.equal('use_relative_e_distances' in processConfig, false);
-      assert.equal(processConfig.layer_gcode, '; next layer');
+      assert.equal(processConfig.layer_gcode, 'G92 E0\n; next layer');
     }
     assert.equal((await f.loaded()).length, 3);
     for (const file of await f.loaded()) {
@@ -422,7 +421,7 @@ for (const [layout, binary, profiles, slicerType = 'bambustudio'] of [
   });
 }
 
-test('Orca applies absolute extrusion to the machine that owns the extrusion mode and layer G-code', async t => {
+test('Orca keeps the machine preset extrusion mode and layer G-code', async t => {
   const f = await fixture(t, 'orcaslicer');
   await f.write('machine', { name: 'SAFETY base', nozzle_diameter: ['0.4'], machine_start_gcode: 'GENERIC',
     use_relative_e_distances: '1', layer_change_gcode: 'G92 E0\n; machine layer' });
@@ -434,8 +433,9 @@ test('Orca applies absolute extrusion to the machine that owns the extrusion mod
     const args = await f.args();
     const [machineFile, processFile] = args[args.indexOf('--load-settings') + 1].split(';');
     const machine = JSON.parse(await fs.readFile(machineFile, 'utf8'));
-    assert.equal(machine.use_relative_e_distances, '0');
-    assert.equal(machine.layer_change_gcode, '; machine layer');
+    // Bambu presets are relative-E; forcing absolute E over-extruded from layer 3.
+    assert.equal(machine.use_relative_e_distances, '1');
+    assert.equal(machine.layer_change_gcode, 'G92 E0\n; machine layer');
     assert.equal(machine.machine_start_gcode, 'M620 S0A ; correct machine');
     const config = JSON.parse(await fs.readFile(processFile, 'utf8'));
     assert.equal('use_relative_e_distances' in config, false, 'the machine supplies the extrusion mode');
