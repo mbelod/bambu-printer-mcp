@@ -8,7 +8,7 @@
 ### Added
 - `print_3mf` accepts `bed_cleared_for_job`. A printer keeps reporting `FINISH` after its screen is dismissed, which blocked every print from clients without elicitation until a restart. The refusal now explains this and names a token bound to that exact finished job; passing it after removing the part allows the print. Stale tokens are ignored. Verified on an A1: a print refused with the token printed to completion after the token was passed.
 - The FINISH refusal now leads with the `bed_cleared_for_job` token instead of the generic elicitation text.
-- `FAILED` (a failed or stopped job) is handled like `FINISH`. The A1 keeps that state after its screen is dismissed, which blocked every upload and print until a restart. Uploads now pass, and a print is refused with a token bound to the failed job until the partial part is removed and `bed_cleared_for_job` is passed. Print errors and HMS faults still refuse.
+- `FAILED` (a failed or stopped job) is handled like `FINISH`. The A1 keeps that state after its screen is dismissed, which blocked every upload and print until a restart. Uploads now pass, and a print is refused with a token bound to the failed job until the partial part is removed and `bed_cleared_for_job` is passed. Print errors and HMS faults still refuse. Verified on an A1: a stopped job was refused with its token, then printed cleanly once the token was passed.
 - The HMS 0500-0500-0001-0007 message no longer pins the rule to firmware 01.08.05: an A1 on 01.08.01 already enforces it.
 - New end-to-end tests drive `print_3mf` through the MCP tool handler for the token flow and the FAILED message, which the earlier unit tests skipped (they missed the token being wired to the wrong call).
 
