@@ -445,12 +445,18 @@ export class BambuImplementation {
      * every later state check of the same print, which stops the print if the
      * situation the human confirmed has changed.
      */
-    async confirmPrintPreflight(serial, status, inspection) {
+    /** Short, stable token naming one finished job; a stale token cannot match a later job. */
+    finishedJobToken(finishedJob) {
+        return createHash("sha256").update(finishedJob).digest("hex").slice(0, 12);
+    }
+    async confirmPrintPreflight(serial, status, inspection, bedClearedForJob) {
         const finishedJob = this.finishedJobIdentity(status);
+        const finishedToken = finishedJob !== undefined ? this.finishedJobToken(finishedJob) : undefined;
+        const bedDeclaredClear = finishedToken !== undefined && bedClearedForJob === finishedToken;
         const cleared = this.clearedErrors.get(serial);
         const notices = hiddenHmsNotices(status?.raw, serial, inspection.model);
         const unchipped = unchippedNozzles(status?.raw);
-        await this.confirmHardwareAction(`Start a checked print on ${inspection.model.toUpperCase()} (${serial})? Nozzles: ${inspection.nozzleDiameters.join(", ")} mm. ` +
+        const confirmation = this.confirmHardwareAction(`Start a checked print on ${inspection.model.toUpperCase()} (${serial})? Nozzles: ${inspection.nozzleDiameters.join(", ")} mm. ` +
             `Materials: ${inspection.materials.join(", ")}. Peak targets: nozzle ${inspection.maxNozzleTemperature}°C, bed ${inspection.maxBedTemperature}°C, chamber ${inspection.maxChamberTemperature}°C. ` +
             `File SHA-256: ${inspection.sha256}. Confirm the physical spool labels and that the build plate is clear.` +
             (finishedJob !== undefined ? " The printer reports FINISH: remove the previous part and debris before confirming." : "") +
@@ -458,7 +464,17 @@ export class BambuImplementation {
             (notices.length ? ` The printer also reports ${notices.join(", ")}, which Bambu lists for this model without text and never shows as a fault; ` +
                 `${notices.length === 1 ? "it does" : "they do"} not block printing.` : "") +
             (unchipped.length ? ` Printer ${unchipped.length === 1 ? `nozzle ${unchipped[0]} reports` : `nozzles ${unchipped.join(" and ")} report`} no identity chip, ` +
-                `so ${unchipped.length === 1 ? "its" : "their"} diameter and type are the printer's configured settings; confirm they match the installed ${unchipped.length === 1 ? "hotend" : "hotends"}.` : ""), finishedJob !== undefined || !!cleared);
+                `so ${unchipped.length === 1 ? "its" : "their"} diameter and type are the printer's configured settings; confirm they match the installed ${unchipped.length === 1 ? "hotend" : "hotends"}.` : ""), (finishedJob !== undefined && !bedDeclaredClear) || !!cleared);
+        try {
+            await confirmation;
+        }
+        catch (error) {
+            if (finishedToken === undefined || bedDeclaredClear || cleared)
+                throw error;
+            const name = status.raw.subtask_name || status.raw.gcode_file || "previous job";
+            throw new Error(`${error?.message ?? error} The printer still reports "${name}" as FINISH; dismissing the finished screen does not reset that state ` +
+                `(a new job or a printer restart does). After removing that part and any debris, retry with bed_cleared_for_job="${finishedToken}".`);
+        }
         return { finishedJob, serial, model: inspection.model, notices };
     }
     /** Stop a print whose confirmed situation changed: a newly finished job, or a hidden HMS notice the preflight did not name. */
@@ -750,7 +766,7 @@ export class BambuImplementation {
             requirements = this.validateLoadedGcodeState(initialStatus, inspection);
         else
             validatePrinterState(initialStatus, requirements);
-        const bedClearance = await this.confirmPrintPreflight(serial, initialStatus, inspection);
+        const bedClearance = await this.confirmPrintPreflight(serial, initialStatus, inspection, options.bedClearedForJob);
         const confirmedStatus = await this.getSafetyStatus(host, serial, token);
         if (legacyContainer)
             requirements = this.validateLoadedGcodeState(confirmedStatus, inspection);

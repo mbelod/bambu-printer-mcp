@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- OrcaSlicer slicing keeps the presets' extrusion mode instead of forcing absolute E. Bambu layer G-code issues `M83` (the A1's layer-3 clog check), so forced absolute E over-extruded from layer 3 until the extruder skipped. Verified on an A1: the server slice printed cleanly.
+
+### Added
+- `print_3mf` accepts `bed_cleared_for_job`. A printer keeps reporting `FINISH` after its screen is dismissed, which blocked every print from clients without elicitation until a restart. The refusal now explains this and names a token bound to that exact finished job; passing it after removing the part allows the print. Stale tokens are ignored.
+
 ## [1.1.38] – 2026-10-27
 
 ### Fixed

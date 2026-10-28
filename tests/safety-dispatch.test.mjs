@@ -743,6 +743,45 @@ test("FINISH requires bed clearance even with ordinary headless prompts disabled
   assertNoDispatch(events);
 });
 
+function headless(t) {
+  const previous = process.env.BAMBU_REQUIRE_CONFIRMATION;
+  process.env.BAMBU_REQUIRE_CONFIRMATION = "0";
+  t.after(() => { if (previous === undefined) delete process.env.BAMBU_REQUIRE_CONFIRMATION; else process.env.BAMBU_REQUIRE_CONFIRMATION = previous; });
+}
+
+test("FINISH refusal explains the stale state and names a job-bound token", async (t) => {
+  headless(t);
+  const file = await fixture(t);
+  const { printer, events } = isolatedPrinter(safetyStatus({ state: "FINISH", subtask_name: "previous-part" }));
+  printer.confirm = async () => false;
+  await assert.rejects(printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false }),
+    /"previous-part" as FINISH.*does not reset.*bed_cleared_for_job="[0-9a-f]{12}"/s);
+  assertNoDispatch(events);
+});
+
+test("bed_cleared_for_job for the reported finished job skips the physical-check prompt", async (t) => {
+  headless(t);
+  const file = await fixture(t);
+  const finished = safetyStatus({ state: "FINISH", subtask_name: "previous-part" });
+  const { printer } = isolatedPrinter(finished);
+  let prompted = false;
+  printer.confirm = async () => { prompted = true; return false; };
+  const ok = printer.finishedJobToken(JSON.stringify([finished.raw.gcode_file, finished.raw.subtask_name, finished.raw.task_id, finished.raw.subtask_id]));
+  await printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false, bedClearedForJob: ok });
+  assert.equal(prompted, false);
+});
+
+test("a stale bed_cleared_for_job token still requires the physical check", async (t) => {
+  headless(t);
+  const file = await fixture(t);
+  const { printer, events } = isolatedPrinter(safetyStatus({ state: "FINISH", subtask_name: "previous-part" }));
+  const prompts = [];
+  printer.confirm = async message => { prompts.push(message); return false; };
+  await assert.rejects(printer.print3mf(host, serial, token, { projectName: "confirm", filePath: file, bambuModel: "p1s", useAMS: false, bedClearedForJob: "000000000000" }), /declined/i);
+  assert.equal(prompts.length, 1);
+  assertNoDispatch(events);
+});
+
 test("bed clearance cannot authorize a different finished job", async (t) => {
   const file = await fixture(t);
   const { printer, events } = isolatedPrinter(safetyStatus({ state: "FINISH", subtask_name: "previous-part" }));

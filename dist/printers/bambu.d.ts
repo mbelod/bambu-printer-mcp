@@ -24,6 +24,12 @@ interface BambuPrintOptionsInternal {
      * ergonomic callers; `amsMapping` takes precedence if both are set.
      */
     amsSlots?: number[];
+    /**
+     * Token from a FINISH refusal (finishedJobToken). Declares that the part of
+     * that exact finished job was removed, so the bed check becomes an ordinary
+     * confirmation instead of one that always needs elicitation.
+     */
+    bedClearedForJob?: string;
     md5?: string;
 }
 /** What the human confirmed in confirmPrintPreflight, checked again before dispatch. */
@@ -51,7 +57,9 @@ export declare class BambuImplementation {
      * every later state check of the same print, which stops the print if the
      * situation the human confirmed has changed.
      */
-    confirmPrintPreflight(serial: string, status: any, inspection: Awaited<ReturnType<typeof inspectPrintFile>>): Promise<PrintPreflight>;
+    /** Short, stable token naming one finished job; a stale token cannot match a later job. */
+    finishedJobToken(finishedJob: string): string;
+    confirmPrintPreflight(serial: string, status: any, inspection: Awaited<ReturnType<typeof inspectPrintFile>>, bedClearedForJob?: string): Promise<PrintPreflight>;
     /** Stop a print whose confirmed situation changed: a newly finished job, or a hidden HMS notice the preflight did not name. */
     assertBedClearance(status: any, preflight: PrintPreflight): void;
     private getPrinter;
